@@ -20,7 +20,9 @@ If you are new to neural networks, this ["Dummy's Guide"](https://x.com/hooeem/s
 
 ## Quick start
 
-**Requirements:** A single NVIDIA GPU (tested on H100), Python 3.10+, [uv](https://docs.astral.sh/uv/).
+**Requirements (upstream):** A single NVIDIA GPU (tested on H100), Python 3.10+, [uv](https://docs.astral.sh/uv/).
+
+**This fork:** Also runs on **CPU-only** and non-NVIDIA systems (e.g. AMD Radeon laptops), but training will of course be slower. See the CPU/AMD notes further below.
 
 ```bash
 
@@ -85,6 +87,25 @@ I think these would be the reasonable hyperparameters to play with. Ask your fav
 - [miolini/autoresearch-macos](https://github.com/miolini/autoresearch-macos) (MacOS)
 - [trevin-creator/autoresearch-mlx](https://github.com/trevin-creator/autoresearch-mlx) (MacOS)
 - [jsegov/autoresearch-win-rtx](https://github.com/jsegov/autoresearch-win-rtx) (Windows)
+
+## Running on CPU and AMD Radeon GPUs (Windows)
+
+This fork has been adapted to run on machines without NVIDIA CUDA by default, while keeping the original NVIDIA path intact:
+
+- If no CUDA device is present, `train.py` falls back to **CPU**.
+- `torch.compile` is **disabled by default on CPU** to avoid requiring a local C++ compiler (e.g. MSVC `cl.exe`). You can explicitly enable it with the environment variable `AUTORESEARCH_ENABLE_COMPILE=1` after installing a compatible compiler, or force-disable it everywhere with `AUTORESEARCH_DISABLE_COMPILE=1`.
+- Fused optimizer kernels (Muon + AdamW) automatically fall back to a pure-Python implementation when compilation is disabled.
+
+### AMD Radeon 890M / Ryzen AI (next steps)
+
+On modern AMD laptops (e.g. Ryzen AI with Radeon 890M on Windows 11), the recommended path is:
+
+- Install the latest **AMD Software for Windows** that includes \"PyTorch on Windows Edition\" support for your Ryzen AI GPU (see AMD's release notes).
+- Alternatively, for experimental GPU acceleration via **DirectML**, you can explore Microsoft's `torch-directml` package (`pip install torch-directml`) and run small PyTorch models on the DirectML device. This repository does not yet wire DirectML into `train.py`, but the code is structured so that adding an additional backend beyond `cpu`/`cuda` is straightforward.
+
+For now, this project should be treated as **CPU-first** on non-NVIDIA hardware; expect training runs to be slower but functionally equivalent.
+
+Last updated: 2026-03-11
 
 ## License
 

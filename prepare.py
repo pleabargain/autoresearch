@@ -295,12 +295,19 @@ def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
 
     # Pre-allocate buffers: [inputs (B*T) | targets (B*T)]
     row_buffer = torch.empty((B, row_capacity), dtype=torch.long)
-    cpu_buffer = torch.empty(2 * B * T, dtype=torch.long, pin_memory=True)
-    gpu_buffer = torch.empty(2 * B * T, dtype=torch.long, device="cuda")
-    cpu_inputs = cpu_buffer[:B * T].view(B, T)
-    cpu_targets = cpu_buffer[B * T:].view(B, T)
-    inputs = gpu_buffer[:B * T].view(B, T)
-    targets = gpu_buffer[B * T:].view(B, T)
+
+    use_cuda = torch.cuda.is_available()
+    # Only use pinned memory and GPU buffers when CUDA is present; otherwise stay on CPU
+    if use_cuda:
+        cpu_buffer = torch.empty(2 * B * T, dtype=torch.long, pin_memory=True)
+        gpu_buffer = torch.empty(2 * B * T, dtype=torch.long, device="cuda")
+        cpu_inputs = cpu_buffer[:B * T].view(B, T)
+        cpu_targets = cpu_buffer[B * T:].view(B, T)
+        inputs = gpu_buffer[:B * T].view(B, T)
+        targets = gpu_buffer[B * T:].view(B, T)
+    else:
+        inputs = torch.empty((B, T), dtype=torch.long)
+        targets = torch.empty((B, T), dtype=torch.long)
 
     while True:
         for row_idx in range(B):
@@ -331,9 +338,13 @@ def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
                     row_buffer[row_idx, pos:pos + remaining] = torch.tensor(doc[:remaining], dtype=torch.long)
                     pos += remaining
 
-        cpu_inputs.copy_(row_buffer[:, :-1])
-        cpu_targets.copy_(row_buffer[:, 1:])
-        gpu_buffer.copy_(cpu_buffer, non_blocking=True)
+        if use_cuda:
+            cpu_inputs.copy_(row_buffer[:, :-1])
+            cpu_targets.copy_(row_buffer[:, 1:])
+            gpu_buffer.copy_(cpu_buffer, non_blocking=True)
+        else:
+            inputs.copy_(row_buffer[:, :-1])
+            targets.copy_(row_buffer[:, 1:])
         yield inputs, targets, epoch
 
 # ---------------------------------------------------------------------------
